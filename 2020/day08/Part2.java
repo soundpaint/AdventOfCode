@@ -1,68 +1,74 @@
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.StringReader;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 
 public class Part2
 {
-  private Part2() {}
+  private enum ExitCode {
+    SEG_FAULT, LOOP_DETECTED
+  }
 
-  int pc = 0;
-  int acc = 0;
+  // registers
 
-  private class AbstractInstruction
+  /** program counter */
+  int pc;
+
+  /** accumulator */
+  int acc;
+
+  abstract private class Instruction
   {
-    private int mnemonic;
-    private int arg;
+    protected String mnemonic;
+    protected int arg;
 
-    private AbstractInstruction() {
+    private Instruction() {
       throw new UnsupportedOperationException("empty constructor");
     }
 
-    protected AbstractInstruction(final String mnemonic, final String arg)
+    protected Instruction(final String mnemonic, final int arg)
     {
-      this.mneminic = mnemonic;
+      this.mnemonic = mnemonic;
       this.arg = arg;
     }
 
-    void execute();
+    public int getArg() { return arg; }
 
-    public String tostring()
+    abstract void execute();
+
+    public String toString()
     {
-      System.out.println(mnemonic + " " + arg);
+      return mnemonic + " " + arg;
     }
   }
 
-  private class ACC extends AbstractInstruction {
-    ACC(final String arg)
+  private class Acc extends Instruction {
+    Acc(final int arg)
     {
-      super(arg);
+      super("acc", arg);
     }
     public void execute()
     {
       pc++;
-      acc += opCode.arg;
+      acc += arg;
     }
   }
 
-  private class JMP extends AbstractInstruction {
-    JMP(final String arg)
+  private class Jmp extends Instruction {
+    Jmp(final int arg)
     {
-      super(arg);
+      super("jmp", arg);
     }
     public void execute()
     {
-      pc += opCode.arg;
+      pc += arg;
     }
   }
 
-  private class NOP extends AbstractInstruction {
-    NOP(final String arg)
+  private class Nop extends Instruction {
+    Nop(final int arg)
     {
-      super(arg);
+      super("nop", arg);
     }
     public void execute()
     {
@@ -70,20 +76,22 @@ public class Part2
     }
   }
 
-  public static Instruction parse(final String unparsed)
+  private Part2() {}
+
+  public Instruction parse(final String unparsed)
   {
     final String tokens[] = unparsed.split(" ");
-    final String arg = Integer.parseInt(tokens[1]);
+    final int arg = Integer.parseInt(tokens[1]);
     final Instruction instruction;
     switch (tokens[0]) {
     case "acc" :
-      instruction = new ACC(arg);
+      instruction = new Acc(arg);
       break;
     case "jmp":
-      instruction = new JMP(arg);
+      instruction = new Jmp(arg);
       break;
     case "nop":
-      instruction = new NOP(arg);
+      instruction = new Nop(arg);
       break;
     default:
       throw new RuntimeException();
@@ -91,9 +99,60 @@ public class Part2
     return instruction;
   }
 
-  private void printPrg(final Instruction[] prg) {
+  private void printProgram(final Instruction[] prg)
+  {
     for (int adr = 0; adr < prg.length; adr++) {
-      System.out.println(prg[adr]);
+      System.out.println(String.format("0x%04X", adr) + "- " + prg[adr]);
+    }
+  }
+
+  private void printRegisters()
+  {
+    System.out.println("pc=" + pc);
+    System.out.println("acc=" + acc);
+  }
+
+  private ExitCode executeProgram(final Instruction[] prg)
+  {
+    pc = 0;
+    acc = 0;
+    final boolean seen[] = new boolean[prg.length];
+    while ((pc != prg.length) && !seen[pc]) {
+      seen[pc] = true;
+      prg[pc].execute();
+    }
+    final ExitCode exitCode;
+    if (pc == prg.length) {
+      System.out.println("program terminated normally");
+      printRegisters();
+      exitCode = ExitCode.SEG_FAULT;
+    } else {
+      System.out.println("program terminated by loop detection");
+      printRegisters();
+      exitCode = ExitCode.LOOP_DETECTED;
+    }
+    return exitCode;
+  }
+
+  private void iterateOverProgramModifications(final Instruction[] prg)
+  {
+    for (int adr = 0; adr < prg.length; adr++) {
+      Instruction modifiedInstruction;
+      Instruction originalInstruction = prg[adr];
+      if (originalInstruction instanceof Nop) {
+        modifiedInstruction = new Jmp(originalInstruction.getArg());
+      } else if (originalInstruction instanceof Jmp) {
+        modifiedInstruction = new Nop(originalInstruction.getArg());
+      } else {
+        System.out.println("no applicable modification at " + adr);
+        continue;
+      }
+      prg[adr] = modifiedInstruction;
+      System.out.println("execute program with modification at " + adr);
+      printProgram(prg);
+      final ExitCode exitCode = executeProgram(prg);
+      prg[adr] = originalInstruction;
+      if (exitCode == ExitCode.SEG_FAULT) break;
     }
   }
 
@@ -107,40 +166,10 @@ public class Part2
     }
     Instruction[] prg = new Instruction[lines.size()];
     int adr = 0;
-    for (final var line : lines) {
-      final Instruction instruction = new Instruction(line);
-      prg[adr++] = instruction;
+    for (final var asmInstruction : lines) {
+      prg[adr++] = parse(asmInstruction);
     }
-    boolean seen[] = new boolean[prg.length];
-    for (int adr = 0; adr < prg.length; adr++) {
-      System.out.println("adr=" + adr);
-      Instruction tmpInstruction;
-      Instruction instruction = prg[adr];
-      if (instruction instanceof NOP) {
-        tmpInstruction = new JMP(instruction.getArg());
-      } else if (instruction instanceof JMP) {
-        tmpInstruction = new NOP(instruction.getArg());
-      } else {
-        System.out.println("skipping " + i);
-        continue;
-      }
-      prg[adr] = tmpInstruction;
-      printPrg(prg);
-      pc = 0;
-      acc = 0;
-      for (int adr = 0; adr < seen.length; adr++) {
-        seen[adr] = false;
-      }
-      while ((pc != prg.length) && !seen[pc]) {
-        seen[pc] = true;
-        execute(prg[pc]);
-      }
-      if (pc == prg.length) {
-        System.out.println("acc=" + acc);
-        break;
-      }
-      prg[adr] = instruction;
-    }
+    iterateOverProgramModifications(prg);
   }
 
   public static void main(final String argv[]) throws IOException

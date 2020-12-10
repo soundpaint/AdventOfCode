@@ -1,118 +1,157 @@
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.StringReader;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 
 public class Part1
 {
-  private Part1() {}
-
-  int pc = 0;
-  int acc = 0;
-
-  public class OpCode
-  {
-    String code;
-    int arg;
+  private enum ExitCode {
+    SEG_FAULT, LOOP_DETECTED
   }
 
-  private void execute(OpCode opCode) {
-    System.out.println(pc + ": " + opCode.code + " " + opCode.arg + " (acc=" + acc + ")");
-    switch (opCode.code) {
-    case "acc" :
+  // registers
+
+  /** program counter */
+  int pc;
+
+  /** accumulator */
+  int acc;
+
+  abstract private class Instruction
+  {
+    protected String mnemonic;
+    protected int arg;
+
+    private Instruction() {
+      throw new UnsupportedOperationException("empty constructor");
+    }
+
+    protected Instruction(final String mnemonic, final int arg)
+    {
+      this.mnemonic = mnemonic;
+      this.arg = arg;
+    }
+
+    public int getArg() { return arg; }
+
+    abstract void execute();
+
+    public String toString()
+    {
+      return mnemonic + " " + arg;
+    }
+  }
+
+  private class Acc extends Instruction {
+    Acc(final int arg)
+    {
+      super("acc", arg);
+    }
+    public void execute()
+    {
       pc++;
-      acc += opCode.arg;
+      acc += arg;
+    }
+  }
+
+  private class Jmp extends Instruction {
+    Jmp(final int arg)
+    {
+      super("jmp", arg);
+    }
+    public void execute()
+    {
+      pc += arg;
+    }
+  }
+
+  private class Nop extends Instruction {
+    Nop(final int arg)
+    {
+      super("nop", arg);
+    }
+    public void execute()
+    {
+      pc++;
+    }
+  }
+
+  private Part1() {}
+
+  public Instruction parse(final String unparsed)
+  {
+    final String tokens[] = unparsed.split(" ");
+    final int arg = Integer.parseInt(tokens[1]);
+    final Instruction instruction;
+    switch (tokens[0]) {
+    case "acc" :
+      instruction = new Acc(arg);
       break;
     case "jmp":
-      pc += opCode.arg;
+      instruction = new Jmp(arg);
       break;
     case "nop":
-      pc++;
+      instruction = new Nop(arg);
       break;
     default:
       throw new RuntimeException();
     }
+    return instruction;
   }
 
-  private void printPrg(OpCode[] prg) {
-    for (int i = 0; i < prg.length; i++) {
-      System.out.println(prg[i].code + " " + prg[i].arg);
+  private void printProgram(final Instruction[] prg)
+  {
+    for (int adr = 0; adr < prg.length; adr++) {
+      System.out.println(String.format("0x%04X", adr) + "- " + prg[adr]);
     }
   }
 
-  private void run1(final String filePath) throws IOException
+  private void printRegisters()
+  {
+    System.out.println("pc=" + pc);
+    System.out.println("acc=" + acc);
+  }
+
+  private ExitCode executeProgram(final Instruction[] prg)
+  {
+    pc = 0;
+    acc = 0;
+    final boolean seen[] = new boolean[prg.length];
+    while ((pc != prg.length) && !seen[pc]) {
+      seen[pc] = true;
+      prg[pc].execute();
+    }
+    final ExitCode exitCode;
+    if (pc == prg.length) {
+      System.out.println("program terminated normally");
+      printRegisters();
+      exitCode = ExitCode.SEG_FAULT;
+    } else {
+      System.out.println("program terminated by loop detection");
+      printRegisters();
+      exitCode = ExitCode.LOOP_DETECTED;
+    }
+    return exitCode;
+  }
+
+  private void run(final String filePath) throws IOException
   {
     final var reader = new BufferedReader(new FileReader(filePath));
-    final var values = new ArrayList<String>();
+    final var lines = new ArrayList<String>();
     String line;
     while ((line = reader.readLine()) != null) {
-      values.add(line);
+      lines.add(line);
     }
-    OpCode[] prg = new OpCode[values.size()];
-    int ln = 0;
-    for (final var value : values) {
-      OpCode opCode = new OpCode();
-      prg[ln++] = opCode;
-      String op[] = value.split(" ");
-      opCode.code = op[0];
-      System.out.println(op[1]);
-      opCode.arg = Integer.parseInt(op[1]);
+    Instruction[] prg = new Instruction[lines.size()];
+    int adr = 0;
+    for (final var asmInstruction : lines) {
+      prg[adr++] = parse(asmInstruction);
     }
-    boolean seen[] = new boolean[prg.length];
-    for (int i = 0; i < prg.length; i++) {
-      System.out.println("i=" + i);
-      OpCode opCode = prg[i];
-      if (opCode.code.equals("nop")) {
-        opCode.code = "jmp";
-      } else if (opCode.code.equals("jmp")) {
-        opCode.code = "nop";
-      } else {
-        System.out.println("skipping " + i);
-        continue;
-      }
-      printPrg(prg);
-      pc = 0;
-      acc = 0;
-      for (int j = 0; j < seen.length; j++) {
-        seen[j] = false;
-      }
-      while ((pc != prg.length) && !seen[pc]) {
-        seen[pc] = true;
-        execute(prg[pc]);
-      }
-      if (pc == prg.length) {
-        System.out.println("acc=" + acc);
-        break;
-      }
-      if (opCode.code.equals("nop")) {
-        opCode.code = "jmp";
-      } else if (opCode.code.equals("jmp")) {
-        opCode.code = "nop";
-      }
-    }
-    // System.out.println("acc=" + acc);
-    // 949
-  }
-
-  private void run2(final String filePath) throws IOException
-  {
-    final var path = Paths.get(filePath);
-    final var data =
-      new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
-    final String values[] = data.trim().split("[,\\s]");
-    for (final var value : values) {
-      System.out.println("[" + value + "]");
-    }
+    executeProgram(prg);
   }
 
   public static void main(final String argv[]) throws IOException
   {
-    new Part1().run1("data.txt");
+    new Part1().run("data.txt");
   }
 }
