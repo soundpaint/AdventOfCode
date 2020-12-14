@@ -1,4 +1,4 @@
-Adevent of Code
+Advent of Code
 ===============
 
 The purpose of this repository is to document the results of my participation in the
