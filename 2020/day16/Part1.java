@@ -101,14 +101,16 @@ public class Part1
   private long check(String[] values)
   {
     long sum = 0;
+    boolean isValid = true;
     for (String value : values) {
       long longValue = Long.parseLong(value);
       Rule rule = check(longValue);
       if (rule == null) {
         sum += longValue;
+        isValid = false;
       }
     }
-    return sum;
+    return isValid ? -1 : sum;
   }
 
   private boolean ruleApplicableForAllTickets(Rule rule, int column)
@@ -217,9 +219,10 @@ public class Part1
     while ((line = reader.readLine()) != null) {
       values = line.split(",");
       long singleSum = check(values);
-      sum += singleSum;
-      if (singleSum == 0) {
+      if (singleSum == -1) {
         tickets.add(new Ticket(values));
+      } else {
+        sum += singleSum;
       }
     }
     System.out.println(sum);
