@@ -10,45 +10,45 @@ public class Part2
   private static final int MUL = -3;
   private static final int LEFT_PAREN = -4;
   private static final int RIGHT_PAREN = -5;
-  private static final int NO_PUSH_BACK = -6;
+  private static final int NO_LOOK_AHEAD = -6;
 
-  final Lexer lexer;
+  private final Lexer lexer;
 
   private static class Lexer
   {
     private String input;
     private int pos;
-    private int pushBack;
+    private int lookAhead;
 
     public void setInput(final String input)
     {
       this.input = input;
       pos = 0;
-      pushBack = NO_PUSH_BACK;
+      lookAhead = NO_LOOK_AHEAD;
     }
 
-    private boolean havePushBack() {
-      return pushBack != NO_PUSH_BACK;
+    private boolean haveLookAhead() {
+      return lookAhead != NO_LOOK_AHEAD;
     }
 
-    private int consumePushBack() {
-      int token = pushBack;
-      pushBack = NO_PUSH_BACK;
-      return token;
+    private int consumeLookAhead() {
+      final int symbol = lookAhead;
+      lookAhead = NO_LOOK_AHEAD;
+      return symbol;
     }
 
-    public void pushBack(final int token)
+    public void pushBack(final int symbol)
     {
-      if (havePushBack()) {
+      if (haveLookAhead()) {
         throw new RuntimeException("lexer: multiple push back not supported");
       }
-      pushBack = token;
+      lookAhead = symbol;
     }
 
-    public int nextToken()
+    public int nextSymbol()
     {
-      if (havePushBack()) {
-        return consumePushBack();
+      if (haveLookAhead()) {
+        return consumeLookAhead();
       }
       int value = 0;
       boolean inValue = false; // lexer state
@@ -74,7 +74,7 @@ public class Part2
         case ')':
           return RIGHT_PAREN;
         default:
-          throw new RuntimeException("lexer: unknwon char: '" + ch + "'");
+          throw new RuntimeException("lexer: unexpected char: '" + ch + "'");
         }
       }
       if (inValue) return value;
@@ -98,10 +98,9 @@ public class Part2
     long sum = 0;
     for (final String line : lines) {
       lexer.setInput(line);
-      long value = parseExpr();
-      if (lexer.nextToken() != EOF)
+      sum += parseExpr();
+      if (lexer.nextSymbol() != EOF)
         throw new RuntimeException("parser: unexpected trailing characters");
-      sum += value;
     }
     System.out.println(sum);
   }
@@ -111,11 +110,11 @@ public class Part2
     // expr ::= factor | factor "*" expr .
     final long expr;
     final long factor = parseFactor();
-    final int token = lexer.nextToken();
-    if (token == MUL) {
+    final int symbol = lexer.nextSymbol();
+    if (symbol == MUL) {
       expr = factor * parseExpr();
     } else {
-      lexer.pushBack(token);
+      lexer.pushBack(symbol);
       expr = factor;
     }
     return expr;
@@ -126,11 +125,11 @@ public class Part2
     // factor ::= term | term "+" factor .
     final long factor;
     final long term = parseTerm();
-    final int token = lexer.nextToken();
-    if (token == PLUS) {
+    final int symbol = lexer.nextSymbol();
+    if (symbol == PLUS) {
       factor = term + parseFactor();
     } else {
-      lexer.pushBack(token);
+      lexer.pushBack(symbol);
       factor = term;
     }
     return factor;
@@ -140,11 +139,11 @@ public class Part2
   {
     // term ::= constValue | parenExpr .
     final long term;
-    final int token = lexer.nextToken();
-    if (token >= 0) {
-      term = token;
+    final int symbol = lexer.nextSymbol();
+    if (symbol >= 0) {
+      term = symbol;
     } else {
-      lexer.pushBack(token);
+      lexer.pushBack(symbol);
       term = parseParenExpr();
     }
     return term;
@@ -154,13 +153,13 @@ public class Part2
   {
     // parenExpr ::= '(' expr ')' .
     final long parenExpr;
-    int token = lexer.nextToken();
-    if (token != LEFT_PAREN) {
+    int symbol = lexer.nextSymbol();
+    if (symbol != LEFT_PAREN) {
       throw new RuntimeException("parser: '(' expected");
     }
     parenExpr = parseExpr();
-    token = lexer.nextToken();
-    if (token != RIGHT_PAREN)
+    symbol = lexer.nextSymbol();
+    if (symbol != RIGHT_PAREN)
       throw new RuntimeException("parser: ')' expected");
     return parenExpr;
   }
