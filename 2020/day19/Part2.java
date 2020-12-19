@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.TreeSet;
 
-public class Part1
+public class Part2
 {
   private static final boolean DEBUG = false;
   private final Log log;
@@ -252,7 +252,7 @@ public class Part1
     }
   }
 
-  private Part1()
+  private Part2()
   {
     log = new Log();
     id2rule = new HashMap<Integer, Rule>();
@@ -302,16 +302,30 @@ public class Part1
     System.out.println(sum);
   }
 
+  private void modifiyRulesForPart2()
+  {
+    final Expansion expansionForRule8 = new Expansion(log, "42 8");
+    expansionForRule8.resolve(id2rule);
+    final ExpansionRule rule8 = (ExpansionRule)id2rule.get(8);
+    rule8.expansions.add(expansionForRule8);
+
+    final Expansion expansionForRule11 = new Expansion(log, "42 11 31");
+    expansionForRule11.resolve(id2rule);
+    final ExpansionRule rule11 = (ExpansionRule)id2rule.get(11);
+    rule11.expansions.add(expansionForRule11);
+  }
+
   private void run(final String filePath) throws IOException
   {
     final var reader = new BufferedReader(new FileReader(filePath));
     loadGrammar(reader);
+    modifiyRulesForPart2();
     // printGrammar();
     parseMessages(reader);
   }
 
   public static void main(final String argv[]) throws IOException
   {
-    new Part1().run("data.txt");
+    new Part2().run("data.txt");
   }
 }
