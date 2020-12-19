@@ -1,34 +1,29 @@
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.StringReader;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 
 public class Part1
 {
   private Part1() {}
-  private int cycle;
 
-  char[][][] createCube(int d)
+  private char[][][] createCube(final int d)
   {
-    char[][][] cube = new char[d][][];
-    for (int i = 0; i < d; i++) {
-      cube[i] = new char[d][];
-      for (int j = 0; j < d; j++) {
-        cube[i][j] = new char[d];
-        for (int k = 0; k < d; k++) {
-          cube[i][j][k] = '.';
+    final char[][][] cube = new char[d][][];
+    for (int x = 0; x < d; x++) {
+      cube[x] = new char[d][];
+      for (int y = 0; y < d; y++) {
+        cube[x][y] = new char[d];
+        for (int z = 0; z < d; z++) {
+          cube[x][y][z] = '.';
         }
       }
     }
     return cube;
   }
 
-  void printCube(char[][][] cube)
+  private void printCube(final char[][][] cube)
   {
     for (int z = 0; z < cube.length; z++) {
       System.out.println();
@@ -42,12 +37,12 @@ public class Part1
     }
   }
 
-  void countActive(char[][][] cube)
+  private void countActive(final char[][][] cube)
   {
     int count = 0;
-    for (int z = 0; z < cube.length; z++) {
+    for (int x = 0; x < cube.length; x++) {
       for (int y = 0; y < cube.length; y++) {
-        for (int x = 0; x < cube.length; x++) {
+        for (int z = 0; z < cube.length; z++) {
           if (cube[x][y][z] == '#') count++;
         }
       }
@@ -55,7 +50,8 @@ public class Part1
     System.out.println(count);
   }
 
-  private boolean isActive(char[][][] cube, int x, int y, int z)
+  private boolean isActive(final char[][][] cube,
+                           final int x, final int y, final int z)
   {
     if ((x < 0) || (x >= cube.length)) return false;
     if ((y < 0) || (y >= cube.length)) return false;
@@ -63,7 +59,8 @@ public class Part1
     return cube[x][y][z] == '#';
   }
 
-  private int countActiveNeighbours(char[][][] cube, int x0, int y0, int z0)
+  private int countActiveNeighbours(final char[][][] cube,
+                                    final int x0, final int y0, final int z0)
   {
     int count = 0;
     for (int x = x0 - 1; x <= x0 + 1; x++) {
@@ -79,13 +76,14 @@ public class Part1
     return count;
   }
 
-  private void update(char[][][] cubeSource, char[][][] cubeDest)
+  private void update(final char[][][] cubeSource, final char[][][] cubeDest)
   {
     for (int x = 0; x < cubeSource.length; x++) {
       for (int y = 0; y < cubeSource.length; y++) {
         for (int z = 0; z < cubeSource.length; z++) {
-          int activeNeighbours = countActiveNeighbours(cubeSource, x, y, z);
-          boolean active = cubeSource[x][y][z] == '#';
+          final int activeNeighbours =
+            countActiveNeighbours(cubeSource, x, y, z);
+          final boolean active = cubeSource[x][y][z] == '#';
           if (active && ((activeNeighbours == 2) || (activeNeighbours == 3))) {
             cubeDest[x][y][z] = '#';
           } else if (!active && (activeNeighbours == 3)) {
@@ -98,7 +96,9 @@ public class Part1
     }
   }
 
-  private void run1(final String filePath) throws IOException
+  private char[][][] loadInitialConfiguration(final String filePath,
+                                              final int padding)
+    throws IOException
   {
     final var reader = new BufferedReader(new FileReader(filePath));
     final var values = new ArrayList<String>();
@@ -106,44 +106,35 @@ public class Part1
     while ((line = reader.readLine()) != null) {
       values.add(line);
     }
-    int cycles = 6;
-    int offs = cycles;
-    int d = values.size();
-    char[][][] cube1 = createCube(d + 2 * cycles);
+    final int d = values.size();
+    final char[][][] cube = createCube(d + 2 * padding);
     int y = 0;
     for (final var value : values) {
       for (int x = 0; x < value.length(); x++) {
-        cube1[offs + x][offs + y][offs]  = value.charAt(x);
+        cube[padding + x][padding + y][padding]  = value.charAt(x);
       }
       y++;
     }
-    System.out.println("Before any cycles:");
-    printCube(cube1);
-    char[][][] cube2 = createCube(d + 2 * cycles);
-    for (cycle = 0; cycle < cycles; cycle++) {
+    return cube;
+  }
+
+  private void run(final String filePath) throws IOException
+  {
+    final int cycles = 6;
+    char[][][] cube1 = loadInitialConfiguration(filePath, cycles);
+    final int d = cube1.length;
+    char[][][] cube2 = createCube(cube1.length);
+    for (int cycle = 0; cycle < cycles; cycle++) {
       update(cube1, cube2);
-      char[][][] swap = cube1;
+      final char[][][] swap = cube1;
       cube1 = cube2;
       cube2 = swap;
-      System.out.println("After " + (cycle + 1) + " cycles:");
-      printCube(cube1);
     }
     countActive(cube1);
   }
 
-  private void run2(final String filePath) throws IOException
-  {
-    final var path = Paths.get(filePath);
-    final var data =
-      new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
-    final String values[] = data.trim().split("[,\\s]");
-    for (final var value : values) {
-      System.out.println("[" + value + "]");
-    }
-  }
-
   public static void main(final String argv[]) throws IOException
   {
-    new Part1().run1("data.txt");
+    new Part1().run("data.txt");
   }
 }
