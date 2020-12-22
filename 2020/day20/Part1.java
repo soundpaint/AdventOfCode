@@ -1,13 +1,14 @@
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
-import java.util.HashSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
@@ -107,6 +108,18 @@ public class Part1
       this.x = x;
       this.y = y;
     }
+
+    public boolean equals(Object obj)
+    {
+      if (!(obj instanceof Pair)) return false;
+      Pair other = (Pair)obj;
+      return (x == other.x) && (y == other.y);
+    }
+
+    public int hashCode() {
+      return toString().hashCode();
+    }
+
     public String toString() { return "(" + x + "," + y + ")"; }
   }
 
@@ -846,6 +859,48 @@ public class Part1
     return drawEdgeTile(board, upperLeftCorner, t, 0, 0);
   }
 
+  private static final String[] MONSTER_CHARS = {
+    "                  # ",
+    "#    ##    ##    ###",
+    " #  #  #  #  #  #   "
+  };
+
+  private static final Boolean[][] MONSTER =
+    Arrays.stream(MONSTER_CHARS).map(row -> {
+        return row.chars().mapToObj(c -> c == '#')
+        .collect(Collectors.toList()).toArray(Boolean[]::new);
+      })
+    .collect(Collectors.toList()).toArray(Boolean[][]::new);
+
+  private class MonsterOverlay
+  {
+    ArrayList<Pair> locations;
+    Transform t;
+
+    private MonsterOverlay(ArrayList<Pair> locations, Transform t)
+    {
+      this.locations = locations;
+      this.t = t;
+    }
+
+    private int countWaves(Boolean[][] monster)
+    {
+      HashSet<Pair> waves = new HashSet<Pair>();
+      for (Pair location : locations) {
+        int x0 = location.x;
+        int y0 = location.y;
+        for (int x = 0; x < monster.length; x++) {
+          for (int y = 0; y < monster[0].length; y++) {
+            if (monster[x][y]) {
+              waves.add(new Pair(x0 + x, y0 + y));
+            }
+          }
+        }
+      }
+      return waves.size();
+    }
+  }
+
   private class Image
   {
     final boolean[][] pixels;
@@ -872,6 +927,64 @@ public class Part1
           }
         }
       }
+    }
+
+    boolean getBitAfterTransform(Transform t, int x, int y)
+    {
+      Pair p = t.getReverse().translate(new Pair(x, y), pixels.length);
+      return pixels[p.x][p.y];
+    }
+
+    boolean monsterAt(Boolean[][] monster, Transform t, int x0, int y0)
+    {
+      for (int x = 0; x < monster.length; x++) {
+        for (int y = 0; y < monster[0].length; y++) {
+          if (monster[x][y] && !getBitAfterTransform(t, x0 + x, y0 + y)) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+
+    ArrayList<Pair> monstersAt(Boolean[][] monster, Transform t)
+    {
+      ArrayList<Pair> locations = new ArrayList<Pair>();
+      for (int x0 = 0; x0 < pixels.length - monster.length; x0++) {
+        for (int y0 = 0; y0 < pixels.length - monster[0].length; y0++) {
+          if (monsterAt(monster, t, x0, y0))
+            locations.add(new Pair(x0, y0));
+        }
+      }
+      return locations;
+    }
+
+    MonsterOverlay searchMonster(Boolean[][] monster)
+    {
+      ArrayList<Pair> maxLocations = null;
+      Transform maxT = null;
+      for (Transform t : Transform.values()) {
+        ArrayList<Pair> locations = monstersAt(monster, t);
+        int size = locations.size();
+        System.out.println("found " + size + " monsters for transform " + t);
+        if ((maxLocations == null) || (size > maxLocations.size())) {
+          maxLocations = locations;
+          maxT = t;
+        }
+      }
+      return new MonsterOverlay(maxLocations, maxT);
+    }
+
+    int countWaves()
+    {
+      int imageSize = pixels.length;
+      int count = 0;
+      for (int y = 0; y < imageSize; y++) {
+        for (int x = 0; x < imageSize; x++) {
+          if (pixels[x][y]) count++;
+        }
+      }
+      return count;
     }
 
     public String toString()
@@ -931,8 +1044,12 @@ public class Part1
     }
     System.out.println(board);
     Image image = new Image(board);
-    System.out.println(id2tile.get(1171));
     System.out.println(image);
+    int waves = image.countWaves();
+    System.out.println("count " + waves + " waves");
+    MonsterOverlay monsterOverlay = image.searchMonster(MONSTER);
+    int overlayedWaves = monsterOverlay.countWaves(MONSTER);
+    System.out.println("result part 2: " + (waves - overlayedWaves));
   }
 
   public static void main(final String argv[]) throws IOException
