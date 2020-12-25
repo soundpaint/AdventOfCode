@@ -11,47 +11,48 @@ public class Part1
 {
   private class Food
   {
-    String[] ingredients;
-    String[] allergens;
-    Set<String> reducedIngredients;
+    final String[] ingredients;
+    final String[] allergens;
 
-    private void printReducedIngredients()
+    private Food(final String[] ingredients, final String[] allergens)
     {
-      final StringBuffer s = new StringBuffer();
-      for (final String ingredient : reducedIngredients) {
-        if (s.length() > 0) s.append(" ");
-        s.append(ingredient);
-      }
-      System.out.println(s);
+      this.ingredients = ingredients;
+      this.allergens = allergens;
     }
   }
 
   private final ArrayList<Food> foods;
-  private final TreeMap<String, Set<String>> allergen2possibleIngredients;
+  private final TreeMap<String, Set<String>> allergen2ingredients;
 
   private Part1()
   {
     foods = new ArrayList<Food>();
-    allergen2possibleIngredients = new TreeMap<String, Set<String>>();
+    allergen2ingredients = new TreeMap<String, Set<String>>();
   }
 
-  private void printAllergen2possibleIngredients()
+  private void printAllergen2ingredients(final String attribute)
   {
-    for (final String key : allergen2possibleIngredients.keySet()) {
-      System.out.println("allergen " + key + ":");
-      final Set<String> ingredients = allergen2possibleIngredients.get(key);
+    System.out.println("-- allergens " + attribute + " in ingredients --");
+    for (final String allergen : allergen2ingredients.keySet()) {
+      final Set<String> ingredients = allergen2ingredients.get(allergen);
+      final StringBuffer s = new StringBuffer();
       for (final String ingredient : ingredients) {
-        System.out.println("in " + ingredient);
+        if (s.length() > 0) s.append(", ");
+        s.append("'" + ingredient + "'");
       }
+      System.out.println("allergen '" + allergen + "' " +
+                         attribute + " contained in: " + s);
     }
+    System.out.println();
   }
 
-  private boolean removeAllergen(String ingredient, String exceptForIngredient)
+  private boolean removeAllergen(final String ingredient,
+                                 final String exceptForIngredient)
   {
     boolean modified = false;
-    for (final String key : allergen2possibleIngredients.keySet()) {
-      if (key.equals(exceptForIngredient)) continue;
-      final Set<String> ingredients = allergen2possibleIngredients.get(key);
+    for (final String allergen : allergen2ingredients.keySet()) {
+      if (allergen.equals(exceptForIngredient)) continue;
+      final Set<String> ingredients = allergen2ingredients.get(allergen);
       modified |= ingredients.contains(ingredient);
       ingredients.remove(ingredient);
     }
@@ -61,97 +62,77 @@ public class Part1
   private boolean removeUniqueAllergens()
   {
     boolean modified = false;
-    for (final String key : allergen2possibleIngredients.keySet()) {
-      final Set<String> ingredients = allergen2possibleIngredients.get(key);
+    for (final String allergen : allergen2ingredients.keySet()) {
+      final Set<String> ingredients = allergen2ingredients.get(allergen);
       if (ingredients.size() == 1) {
-        modified |= removeAllergen(ingredients.iterator().next(), key);
+        modified |= removeAllergen(ingredients.iterator().next(), allergen);
       }
     }
     return modified;
   }
 
-  private void removeKnownIngredientsWithAllergens()
+  private int removeKnownIngredientsWithAllergens()
   {
-    int sum = 0;
+    int safeIngredients = 0;
     for (final Food food : foods) {
       final Set<String> foodIngredients = new TreeSet<String>();
       foodIngredients.addAll(Arrays.asList(food.ingredients));
-      for (final String key : allergen2possibleIngredients.keySet()) {
-        final Set<String> ingredients = allergen2possibleIngredients.get(key);
+      for (final Set<String> ingredients : allergen2ingredients.values()) {
         if (ingredients.size() == 1) {
           foodIngredients.remove(ingredients.iterator().next());
         }
       }
-      food.reducedIngredients = foodIngredients;
-      sum += foodIngredients.size();
+      safeIngredients += foodIngredients.size();
     }
-    // Result of Part 1
-    System.out.println(sum);
+    return safeIngredients;
   }
 
-  private void printPart2Result()
+  private String buildDangerousIngredientList()
   {
-    final StringBuffer s = new StringBuffer();
-    for (final String key : allergen2possibleIngredients.keySet()) {
-      final Set<String> ingredients = allergen2possibleIngredients.get(key);
+    final StringBuffer list = new StringBuffer();
+    for (final Set<String> ingredients : allergen2ingredients.values()) {
       if (ingredients.size() == 1) {
-        if (s.length() > 0) s.append(",");
-        s.append(ingredients.iterator().next());
+        if (list.length() > 0) list.append(",");
+        list.append(ingredients.iterator().next());
       }
     }
-    System.out.println(s);
+    return list.toString();
   }
 
-  private void parseFood(final ArrayList<String> lines)
+  private Food parseFood(final String unparsed)
   {
-    for (final var line : lines) {
-      final String[] tokens = line.split(" \\(contains ");
-      final String strIngredients = tokens[0];
-      final String[] ingredients = strIngredients.split(" ");
-      final String[] allergens;
-      if (tokens.length > 1) {
-        final String strAllergens =
-          tokens[1].substring(0, tokens[1].length() - 1);
-        allergens = strAllergens.split(", ");
-        for (final String allergen : allergens) {
-          if (allergen2possibleIngredients.containsKey(allergen)) {
-            allergen2possibleIngredients.get(allergen).
-              retainAll(Arrays.asList(ingredients));
-          } else {
-            final Set<String> possibleIngredients = new TreeSet<String>();
-            possibleIngredients.addAll(Arrays.asList(ingredients));
-            allergen2possibleIngredients.put(allergen, possibleIngredients);
-          }
-        }
+    final String[] tokens = unparsed.split(" \\(contains ");
+    final String[] ingredients = tokens[0].split(" ");
+    final String[] allergens =
+      tokens[1].substring(0, tokens[1].length() - 1).split(", ");
+    for (final String allergen : allergens) {
+      if (allergen2ingredients.containsKey(allergen)) {
+        allergen2ingredients.get(allergen).
+          retainAll(Arrays.asList(ingredients));
       } else {
-        allergens = null;
+        final Set<String> possibleIngredients = new TreeSet<String>();
+        possibleIngredients.addAll(Arrays.asList(ingredients));
+        allergen2ingredients.put(allergen, possibleIngredients);
       }
-      final Food food = new Food();
-      food.ingredients = ingredients;
-      food.allergens = allergens;
-      foods.add(food);
     }
+    return new Food(ingredients, allergens);
   }
 
   private void run(final String filePath) throws IOException
   {
     final var reader = new BufferedReader(new FileReader(filePath));
-    final var lines = new ArrayList<String>();
     String line;
     while ((line = reader.readLine()) != null) {
-      lines.add(line);
+      foods.add(parseFood(line));
     }
-    parseFood(lines);
-    printAllergen2possibleIngredients();
-    System.out.println("--------");
+    // printAllergen2ingredients("possibly");
     boolean modified;
     do {
       modified = removeUniqueAllergens();
     } while (modified);
-    printAllergen2possibleIngredients();
-    System.out.println("--------");
-    removeKnownIngredientsWithAllergens();
-    printPart2Result();
+    // printAllergen2ingredients("surely");
+    System.out.println(removeKnownIngredientsWithAllergens()); // part 1 result
+    System.out.println(buildDangerousIngredientList()); // part 2 result
   }
 
   public static void main(final String argv[]) throws IOException
