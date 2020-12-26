@@ -95,12 +95,12 @@ public class Part1
   private enum Transform
   {
     CCW0_0("0-", new Pair( 1,  0), new Pair( 0,  1), false),
-    CCW0_H("0H", new Pair(-1,  0), new Pair( 0,  1), true),
     CCW1_0("1-", new Pair( 0,  1), new Pair(-1,  0), false),
-    CCW1_H("1H", new Pair( 0, -1), new Pair(-1,  0), true),
     CCW2_0("2-", new Pair(-1,  0), new Pair( 0, -1), false),
-    CCW2_H("2H", new Pair( 1,  0), new Pair( 0, -1), true),
     CCW3_0("3-", new Pair( 0, -1), new Pair( 1,  0), false),
+    CCW0_H("0H", new Pair(-1,  0), new Pair( 0,  1), true),
+    CCW1_H("1H", new Pair( 0, -1), new Pair(-1,  0), true),
+    CCW2_H("2H", new Pair( 1,  0), new Pair( 0, -1), true),
     CCW3_H("3H", new Pair( 0,  1), new Pair( 1,  0), true);
 
     private final String mnemonic;
@@ -127,40 +127,11 @@ public class Part1
 
     private boolean isUpsideDown() { return upsideDown; }
 
-    private Direction applyOnDirection1(final Direction direction)
-    {
-      switch (this) {
-      case CCW0_0:
-        return direction;
-      case CCW1_0:
-        return direction.turnLeft(1);
-      case CCW2_0:
-        return direction.turnLeft(2);
-      case CCW3_0:
-        return direction.turnLeft(3);
-      case CCW0_H:
-        return direction.isHorizontal() ?
-          direction.turnOpposite() : direction;
-      case CCW1_H:
-        return direction.isHorizontal() ?
-          direction.turnLeft(1) : direction.turnRight(1);
-      case CCW2_H:
-        return !direction.isHorizontal() ?
-          direction.turnOpposite() : direction;
-      case CCW3_H:
-        return !direction.isHorizontal() ?
-          direction.turnLeft(1) : direction.turnRight(1);
-      default: throw new RuntimeException("unexpected case");
-      }
-    }
-
     private Direction applyOnDirection(final Direction direction)
     {
-      if (isUpsideDown())
-        return flipHorizontally().applyOnDirection(direction.flipHorizontally().
-                                                   turnLeft(ty.y == 0 ? 0 : 2));
-      if (this == CCW0_0) return direction;
-      return turnLeft(1).applyOnDirection(direction.turnRight(1));
+      return ordinal() < 4 ?
+        direction.turnLeft(ordinal()) :
+        direction.turnRight(ordinal() + (direction.isHorizontal() ? 2 : 0));
     }
 
     private void initCache()
@@ -173,15 +144,8 @@ public class Part1
 
     private static Transform fromCCW(final int n)
     {
-      int modN = n % 4;
-      if (modN < 0) modN += 4;
-      switch (modN) {
-      case 0: return CCW0_0;
-      case 1: return CCW1_0;
-      case 2: return CCW2_0;
-      case 3: return CCW3_0;
-      default: throw new RuntimeException("unexpected case");
-      }
+      final int modN = n % 4;
+      return Transform.values()[modN >= 0 ? modN : modN + 4];
     }
 
     private static Transform fromCW(final int n)
@@ -224,45 +188,22 @@ public class Part1
 
     private Transform uncachedConcat(final Transform t)
     {
-      if (this == Transform.CCW0_0)
-        return t;
       if (t == Transform.CCW0_0)
         return this;
-      if (t == Transform.CCW1_0) {
-        switch (this) {
-        case CCW1_0: return Transform.CCW2_0;
-        case CCW2_0: return Transform.CCW3_0;
-        case CCW3_0: return Transform.CCW0_0;
-        case CCW0_H: return Transform.CCW3_H;
-        case CCW1_H: return Transform.CCW0_H;
-        case CCW2_H: return Transform.CCW1_H;
-        case CCW3_H: return Transform.CCW2_H;
-        default:
-        }
-      }
-      if (t == Transform.CCW0_H) {
-        switch (this) {
-        case CCW1_0: return Transform.CCW1_H;
-        case CCW2_0: return Transform.CCW2_H;
-        case CCW3_0: return Transform.CCW3_H;
-        case CCW0_H: return Transform.CCW0_0;
-        case CCW1_H: return Transform.CCW1_0;
-        case CCW2_H: return Transform.CCW2_0;
-        case CCW3_H: return Transform.CCW3_0;
-        default:
-        }
-      }
-      if (t == Transform.CCW2_0)
-        return concat(Transform.CCW1_0).concat(Transform.CCW1_0);
-      if (t == Transform.CCW3_0)
-        return concat(Transform.CCW2_0).concat(Transform.CCW1_0);
-      if (t == Transform.CCW1_H)
-        return concat(Transform.CCW1_0).concat(Transform.CCW0_H);
-      if (t == Transform.CCW2_H)
-        return concat(Transform.CCW2_0).concat(Transform.CCW0_H);
-      if (t == Transform.CCW3_H)
-        return concat(Transform.CCW3_0).concat(Transform.CCW0_H);
-      throw new RuntimeException("unexpected case");
+      if (t == Transform.CCW1_0)
+        if (ordinal() < 4)
+          return Transform.values()[(ordinal() + 1) % 4];
+        else
+          return Transform.values()[(ordinal() + 3) % 4 + 4];
+      if (t == Transform.CCW0_H)
+        return Transform.values()[(ordinal() + 4) % 8];
+      if (t.ordinal() < 4)
+        return
+          uncachedConcat(Transform.values()[t.ordinal() - 1]).
+          uncachedConcat(Transform.CCW1_0);
+      return
+        uncachedConcat(Transform.values()[t.ordinal() - 4]).
+        uncachedConcat(Transform.CCW0_H);
     }
 
     private Pair translate(final Pair p, final int size) {
