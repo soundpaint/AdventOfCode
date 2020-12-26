@@ -5,8 +5,6 @@ import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 import java.util.TreeMap;
@@ -15,28 +13,29 @@ import java.util.stream.Collectors;
 
 public class Part1
 {
-  private Part1()
-  {
-    id2tile = new TreeMap<Integer, Tile>();
-  }
-
-  Map<Integer, Tile> id2tile;
+  private final Map<Integer, Tile> id2tile;
 
   private enum Direction
   {
-    EAST, NORTH, WEST, SOUTH;
+    EAST(1, 0), NORTH(0, -1), WEST(-1, 0), SOUTH(0, 1);
 
-    private Direction turnLeft() { return turnLeft(1); }
+    private final int dx, dy;
+    private final boolean isHorizontal;
 
-    private Direction turnLeft(int n)
+    private Direction(final int dx, final int dy)
     {
-      int modSum = (ordinal() + n) % 4;
+      this.dx = dx;
+      this.dy = dy;
+      isHorizontal = dy == 0;
+    }
+
+    private Direction turnLeft(final int n)
+    {
+      final int modSum = (ordinal() + n) % 4;
       return Direction.values()[modSum < 0 ? modSum + 4 : modSum];
     }
 
-    private Direction turnRight() { return turnRight(1); }
-
-    private Direction turnRight(int n)
+    private Direction turnRight(final int n)
     {
       return turnLeft(-n);
     }
@@ -46,73 +45,43 @@ public class Part1
       return turnLeft(2);
     }
 
-    private boolean isHorizontalDirection()
+    private Direction flipHorizontally()
     {
-      switch (this) {
-      case EAST:
-      case WEST:
-        return true;
-      case NORTH:
-      case SOUTH:
-        return false;
-      default: throw new RuntimeException("unexpected case");
-      }
+      return isHorizontal ? this : turnOpposite();
     }
 
-    private int ccwDiffTo(Direction other)
+    private boolean isHorizontal() { return isHorizontal; }
+
+    private int ccwDiffTo(final Direction other)
     {
-      int diff = other.ordinal() - ordinal();
+      final int diff = other.ordinal() - ordinal();
       return diff >= 0 ? diff : diff + 4;
     }
 
-    private int cwDiffTo(Direction other)
+    private int cwDiffTo(final Direction other)
     {
       return other.ccwDiffTo(this);
     }
 
-    private int getDX()
-    {
-      switch (this) {
-      case EAST:
-        return +1;
-      case WEST:
-        return -1;
-      case NORTH:
-      case SOUTH:
-        return 0;
-      default: throw new RuntimeException("unexpected case");
-      }
-    }
+    private int getDX() { return dx; }
 
-    private int getDY()
-    {
-      switch (this) {
-      case EAST:
-      case WEST:
-        return 0;
-      case NORTH:
-        return -1;
-      case SOUTH:
-        return +1;
-      default: throw new RuntimeException("unexpected case");
-      }
-    }
+    private int getDY() { return dy; }
   }
 
   private static class Pair
   {
-    int x;
-    int y;
-    Pair(int x, int y)
+    private final int x, y;
+
+    public Pair(final int x, final int y)
     {
       this.x = x;
       this.y = y;
     }
 
-    public boolean equals(Object obj)
+    public boolean equals(final Object obj)
     {
       if (!(obj instanceof Pair)) return false;
-      Pair other = (Pair)obj;
+      final Pair other = (Pair)obj;
       return (x == other.x) && (y == other.y);
     }
 
@@ -125,93 +94,73 @@ public class Part1
 
   private enum Transform
   {
-    CCW0,
-    CCW0_HORIZ_FLIP,
-    CCW1,
-    CCW1_HORIZ_FLIP,
-    CCW2,
-    CCW2_HORIZ_FLIP,
-    CCW3,
-    CCW3_HORIZ_FLIP;
+    CCW0_0("0-", new Pair( 1,  0), new Pair( 0,  1), false),
+    CCW0_H("0H", new Pair(-1,  0), new Pair( 0,  1), true),
+    CCW1_0("1-", new Pair( 0,  1), new Pair(-1,  0), false),
+    CCW1_H("1H", new Pair( 0, -1), new Pair(-1,  0), true),
+    CCW2_0("2-", new Pair(-1,  0), new Pair( 0, -1), false),
+    CCW2_H("2H", new Pair( 1,  0), new Pair( 0, -1), true),
+    CCW3_0("3-", new Pair( 0, -1), new Pair( 1,  0), false),
+    CCW3_H("3H", new Pair( 0,  1), new Pair( 1,  0), true);
 
+    private final String mnemonic;
+    private final Pair tx, ty;
+    private final boolean upsideDown;
     private Transform[] CONCAT;
+
+    private Transform(final String mnemonic,
+                      final Pair tx, final Pair ty,
+                      final boolean upsideDown)
+    {
+      this.mnemonic = mnemonic;
+      this.tx = tx;
+      this.ty = ty;
+      this.upsideDown = upsideDown;
+    }
+
+    private String getMnemonic() { return mnemonic; }
 
     private Transform getReverse()
     {
-      switch (this) {
-      case CCW0: return Transform.CCW0;
-      case CCW0_HORIZ_FLIP: return Transform.CCW0_HORIZ_FLIP;
-      case CCW1: return Transform.CCW3;
-      case CCW1_HORIZ_FLIP: return Transform.CCW1_HORIZ_FLIP;
-      case CCW2: return Transform.CCW2;
-      case CCW2_HORIZ_FLIP: return Transform.CCW2_HORIZ_FLIP;
-      case CCW3: return Transform.CCW1;
-      case CCW3_HORIZ_FLIP: return Transform.CCW3_HORIZ_FLIP;
-      default: throw new RuntimeException("unexpected case");
-      }
+      return concat(concat(this));
     }
 
-    private boolean isUpsideDown()
-    {
-      switch (this) {
-      case CCW0:
-      case CCW1:
-      case CCW2:
-      case CCW3:
-        return false;
-      case CCW0_HORIZ_FLIP:
-      case CCW1_HORIZ_FLIP:
-      case CCW2_HORIZ_FLIP:
-      case CCW3_HORIZ_FLIP:
-        return true;
-      default: throw new RuntimeException("unexpected case");
-      }
-    }
+    private boolean isUpsideDown() { return upsideDown; }
 
-    private Direction applyOnDirection(Direction direction)
+    private Direction applyOnDirection1(final Direction direction)
     {
       switch (this) {
-      case CCW0:
+      case CCW0_0:
         return direction;
-      case CCW1:
+      case CCW1_0:
         return direction.turnLeft(1);
-      case CCW2:
+      case CCW2_0:
         return direction.turnLeft(2);
-      case CCW3:
+      case CCW3_0:
         return direction.turnLeft(3);
-      case CCW0_HORIZ_FLIP:
-        return direction.isHorizontalDirection() ?
+      case CCW0_H:
+        return direction.isHorizontal() ?
           direction.turnOpposite() : direction;
-      case CCW1_HORIZ_FLIP:
-        return direction.isHorizontalDirection() ?
-          direction.turnLeft() : direction.turnRight();
-      case CCW2_HORIZ_FLIP:
-        return !direction.isHorizontalDirection() ?
+      case CCW1_H:
+        return direction.isHorizontal() ?
+          direction.turnLeft(1) : direction.turnRight(1);
+      case CCW2_H:
+        return !direction.isHorizontal() ?
           direction.turnOpposite() : direction;
-      case CCW3_HORIZ_FLIP:
-        return !direction.isHorizontalDirection() ?
-          direction.turnLeft() : direction.turnRight();
+      case CCW3_H:
+        return !direction.isHorizontal() ?
+          direction.turnLeft(1) : direction.turnRight(1);
       default: throw new RuntimeException("unexpected case");
       }
     }
 
-    private Direction getDirection()
+    private Direction applyOnDirection(final Direction direction)
     {
-      switch (this) {
-      case CCW0:
-      case CCW2_HORIZ_FLIP:
-        return Direction.EAST;
-      case CCW1:
-      case CCW1_HORIZ_FLIP:
-        return Direction.NORTH;
-      case CCW2:
-      case CCW0_HORIZ_FLIP:
-        return Direction.WEST;
-      case CCW3:
-      case CCW3_HORIZ_FLIP:
-        return Direction.SOUTH;
-      default: throw new RuntimeException("unexpected case");
-      }
+      if (isUpsideDown())
+        return flipHorizontally().applyOnDirection(direction.flipHorizontally().
+                                                   turnLeft(ty.y == 0 ? 0 : 2));
+      if (this == CCW0_0) return direction;
+      return turnLeft(1).applyOnDirection(direction.turnRight(1));
     }
 
     private void initCache()
@@ -222,35 +171,30 @@ public class Part1
       }
     }
 
-    private static Transform ident()
-    {
-      return CCW0;
-    }
-
-    private static Transform fromCCW(int n)
+    private static Transform fromCCW(final int n)
     {
       int modN = n % 4;
       if (modN < 0) modN += 4;
       switch (modN) {
-      case 0: return CCW0;
-      case 1: return CCW1;
-      case 2: return CCW2;
-      case 3: return CCW3;
+      case 0: return CCW0_0;
+      case 1: return CCW1_0;
+      case 2: return CCW2_0;
+      case 3: return CCW3_0;
       default: throw new RuntimeException("unexpected case");
       }
     }
 
-    private static Transform fromCW(int n)
+    private static Transform fromCW(final int n)
     {
       return fromCCW(-n);
     }
 
-    private Transform turnLeft(int n)
+    private Transform turnLeft(final int n)
     {
       return concat(fromCCW(n));
     }
 
-    private Transform turnRight(int n)
+    private Transform turnRight(final int n)
     {
       return concat(fromCW(n));
     }
@@ -262,15 +206,15 @@ public class Part1
 
     private Transform flipHorizontally()
     {
-      return concat(CCW0_HORIZ_FLIP);
+      return concat(CCW0_H);
     }
 
     private Transform flipVertically()
     {
-      return concat(CCW2_HORIZ_FLIP);
+      return concat(CCW2_H);
     }
 
-    private Transform concat(Transform t)
+    private Transform concat(final Transform t)
     {
       if (CONCAT == null) {
         initCache();
@@ -278,70 +222,54 @@ public class Part1
       return CONCAT[t.ordinal()];
     }
 
-    private Transform uncachedConcat(Transform t)
+    private Transform uncachedConcat(final Transform t)
     {
-      if (this == Transform.CCW0)
+      if (this == Transform.CCW0_0)
         return t;
-      if (t == Transform.CCW0)
+      if (t == Transform.CCW0_0)
         return this;
-      if (t == Transform.CCW1) {
+      if (t == Transform.CCW1_0) {
         switch (this) {
-        case CCW1: return Transform.CCW2;
-        case CCW2: return Transform.CCW3;
-        case CCW3: return Transform.CCW0;
-        case CCW0_HORIZ_FLIP: return Transform.CCW3_HORIZ_FLIP;
-        case CCW1_HORIZ_FLIP: return Transform.CCW0_HORIZ_FLIP;
-        case CCW2_HORIZ_FLIP: return Transform.CCW1_HORIZ_FLIP;
-        case CCW3_HORIZ_FLIP: return Transform.CCW2_HORIZ_FLIP;
+        case CCW1_0: return Transform.CCW2_0;
+        case CCW2_0: return Transform.CCW3_0;
+        case CCW3_0: return Transform.CCW0_0;
+        case CCW0_H: return Transform.CCW3_H;
+        case CCW1_H: return Transform.CCW0_H;
+        case CCW2_H: return Transform.CCW1_H;
+        case CCW3_H: return Transform.CCW2_H;
         default:
         }
       }
-      if (t == Transform.CCW0_HORIZ_FLIP) {
+      if (t == Transform.CCW0_H) {
         switch (this) {
-        case CCW1: return Transform.CCW1_HORIZ_FLIP;
-        case CCW2: return Transform.CCW2_HORIZ_FLIP;
-        case CCW3: return Transform.CCW3_HORIZ_FLIP;
-        case CCW0_HORIZ_FLIP: return Transform.CCW0;
-        case CCW1_HORIZ_FLIP: return Transform.CCW1;
-        case CCW2_HORIZ_FLIP: return Transform.CCW2;
-        case CCW3_HORIZ_FLIP: return Transform.CCW3;
+        case CCW1_0: return Transform.CCW1_H;
+        case CCW2_0: return Transform.CCW2_H;
+        case CCW3_0: return Transform.CCW3_H;
+        case CCW0_H: return Transform.CCW0_0;
+        case CCW1_H: return Transform.CCW1_0;
+        case CCW2_H: return Transform.CCW2_0;
+        case CCW3_H: return Transform.CCW3_0;
         default:
         }
       }
-      if (t == Transform.CCW2)
-        return concat(Transform.CCW1).concat(Transform.CCW1);
-      if (t == Transform.CCW3)
-        return concat(Transform.CCW2).concat(Transform.CCW1);
-      if (t == Transform.CCW1_HORIZ_FLIP)
-        return concat(Transform.CCW1).concat(Transform.CCW0_HORIZ_FLIP);
-      if (t == Transform.CCW2_HORIZ_FLIP)
-        return concat(Transform.CCW2).concat(Transform.CCW0_HORIZ_FLIP);
-      if (t == Transform.CCW3_HORIZ_FLIP)
-        return concat(Transform.CCW3).concat(Transform.CCW0_HORIZ_FLIP);
+      if (t == Transform.CCW2_0)
+        return concat(Transform.CCW1_0).concat(Transform.CCW1_0);
+      if (t == Transform.CCW3_0)
+        return concat(Transform.CCW2_0).concat(Transform.CCW1_0);
+      if (t == Transform.CCW1_H)
+        return concat(Transform.CCW1_0).concat(Transform.CCW0_H);
+      if (t == Transform.CCW2_H)
+        return concat(Transform.CCW2_0).concat(Transform.CCW0_H);
+      if (t == Transform.CCW3_H)
+        return concat(Transform.CCW3_0).concat(Transform.CCW0_H);
       throw new RuntimeException("unexpected case");
     }
 
-    Pair translate(Pair p, int size) {
-      switch(this) {
-      case CCW0:
-        return new Pair(p.x, p.y);
-      case CCW0_HORIZ_FLIP:
-        return new Pair(size - 1 - p.x, p.y);
-      case CCW1:
-        return new Pair(p.y, size - 1 - p.x);
-      case CCW1_HORIZ_FLIP:
-        return new Pair(size - 1 - p.y, size - 1 - p.x);
-      case CCW2:
-        return new Pair(size - 1 - p.x, size - 1 - p.y);
-      case CCW2_HORIZ_FLIP:
-        return new Pair(p.x, size - 1 - p.y);
-      case CCW3:
-        return new Pair(size - 1 - p.y, p.x);
-      case CCW3_HORIZ_FLIP:
-        return new Pair(p.y, p.x);
-      default:
-        throw new RuntimeException("unexpected case");
-      }
+    private Pair translate(final Pair p, final int size) {
+      return new Pair(tx.x * (p.x + (size - 1) * ((tx.x - 1) >> 1)) +
+                      tx.y * (p.y + (size - 1) * ((tx.y - 1) >> 1)),
+                      ty.x * (p.x + (size - 1) * ((ty.x - 1) >> 1)) +
+                      ty.y * (p.y + (size - 1) * ((ty.y - 1) >> 1)));
     }
   }
 
@@ -485,6 +413,11 @@ public class Part1
       }
       return s.toString();
     }
+  }
+
+  private Part1()
+  {
+    id2tile = new TreeMap<Integer, Tile>();
   }
 
   private ArrayList<Tile> sortTiles()
@@ -684,35 +617,8 @@ public class Part1
           Tile tile = tiles[x][y];
           if (x > 0) s.append(" ");
           if (tile != null) {
-            s.append(tile.id + " (");
-            switch (tile.onBoardWithTransform) {
-            case CCW0:
-              s.append("0-");
-              break;
-            case CCW0_HORIZ_FLIP:
-              s.append("0H");
-              break;
-            case CCW1:
-              s.append("1-");
-              break;
-            case CCW1_HORIZ_FLIP:
-              s.append("1H");
-              break;
-            case CCW2:
-              s.append("2-");
-              break;
-            case CCW2_HORIZ_FLIP:
-              s.append("2H");
-              break;
-            case CCW3:
-              s.append("3-");
-              break;
-            case CCW3_HORIZ_FLIP:
-              s.append("3H");
-              break;
-            default: throw new RuntimeException("unexpected case");
-            }
-            s.append(")");
+            s.append(tile.id +
+                     " (" + tile.onBoardWithTransform.getMnemonic() + ")");
           } else {
             s.append("---- (--)");
           }
@@ -787,17 +693,12 @@ public class Part1
     for (LineUpInfo lineUp : corner.lineUps) {
       directions.add(lineUp.direction);
     }
-    if (directions.contains(Direction.EAST) &&
-        directions.contains(Direction.SOUTH))
-      return Transform.CCW0;
-    switch (directions.last()) {
-    case NORTH:
-      return Transform.CCW3;
-    case WEST:
-      return Transform.CCW2;
-    default:
-      return Transform.CCW1;
+    for (int ccw = 0; ccw < 4; ccw++) {
+      if (directions.contains(Direction.EAST.turnRight(ccw)) &&
+          directions.contains(Direction.SOUTH.turnRight(ccw)))
+        return Transform.fromCCW(ccw);
     }
+    throw new RuntimeException("unexpected case");
   }
 
   private boolean examineEdgeDraw(Board board,
