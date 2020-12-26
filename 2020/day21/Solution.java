@@ -7,7 +7,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-public class Part1
+public class Solution
 {
   private class Food
   {
@@ -24,26 +24,10 @@ public class Part1
   private final ArrayList<Food> foods;
   private final TreeMap<String, Set<String>> allergen2ingredients;
 
-  private Part1()
+  private Solution()
   {
     foods = new ArrayList<Food>();
     allergen2ingredients = new TreeMap<String, Set<String>>();
-  }
-
-  private void printAllergen2ingredients(final String attribute)
-  {
-    System.out.println("-- allergens " + attribute + " in ingredients --");
-    for (final String allergen : allergen2ingredients.keySet()) {
-      final Set<String> ingredients = allergen2ingredients.get(allergen);
-      final StringBuffer s = new StringBuffer();
-      for (final String ingredient : ingredients) {
-        if (s.length() > 0) s.append(", ");
-        s.append("'" + ingredient + "'");
-      }
-      System.out.println("allergen '" + allergen + "' " +
-                         attribute + " contained in: " + s);
-    }
-    System.out.println();
   }
 
   private boolean removeAllergen(final String ingredient,
@@ -125,18 +109,15 @@ public class Part1
     while ((line = reader.readLine()) != null) {
       foods.add(parseFood(line));
     }
-    // printAllergen2ingredients("possibly");
-    boolean modified;
-    do {
+    for (boolean modified = true; modified;) {
       modified = removeUniqueAllergens();
-    } while (modified);
-    // printAllergen2ingredients("surely");
-    System.out.println(removeKnownIngredientsWithAllergens()); // part 1 result
-    System.out.println(buildDangerousIngredientList()); // part 2 result
+    }
+    System.out.println(removeKnownIngredientsWithAllergens()); // part 1
+    System.out.println(buildDangerousIngredientList()); // part 2
   }
 
   public static void main(final String argv[]) throws IOException
   {
-    new Part1().run("data.txt");
+    new Solution().run("data.txt");
   }
 }
